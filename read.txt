@@ -1,0 +1,4 @@
+insrtruct2pix is in cartoonify env
+https://github.com/timothybrooks/instruct-pix2pix#other-ways-of-using-instructpix2pix
+
+chyanged utils/m float64 kiya h

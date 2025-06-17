@@ -70,7 +70,6 @@ def extract_5p(lm):
     lm5p = lm5p[[1, 2, 0, 3, 4], :]
     return lm5p
 
-# utils for face reconstruction
 def align_img(img, lm, lm3D, mask=None, target_size=224., rescale_factor=102.):
     """
     Return:
@@ -78,12 +77,6 @@ def align_img(img, lm, lm3D, mask=None, target_size=224., rescale_factor=102.):
         img_new            --PIL.Image  (target_size, target_size, 3)
         lm_new             --numpy.array  (68, 2), y direction is opposite to v direction
         mask_new           --PIL.Image  (target_size, target_size)
-    
-    Parameters:
-        img                --PIL.Image  (raw_H, raw_W, 3)
-        lm                 --numpy.array  (68, 2), y direction is opposite to v direction
-        lm3D               --numpy.array  (5, 3)
-        mask               --PIL.Image  (raw_H, raw_W, 3)
     """
 
     w0, h0 = img.size
@@ -94,10 +87,15 @@ def align_img(img, lm, lm3D, mask=None, target_size=224., rescale_factor=102.):
 
     # calculate translation and scale factors using 5 facial landmarks and standard landmarks of a 3D face
     t, s = POS(lm5p.transpose(), lm3D.transpose())
-    s = rescale_factor/s
+    s = rescale_factor / s
+
+    # Make sure `t` is flat and of float type
+    t = np.array(t).flatten().astype(np.float64)
 
     # processing the image
     img_new, lm_new, mask_new = resize_n_crop_img(img, lm, t, s, target_size=target_size, mask=mask)
-    trans_params = np.array([w0, h0, s, t[0], t[1]])
+
+    # construct safe trans_params
+    trans_params = np.array([w0, h0, s, float(t[0]), float(t[1])])
 
     return trans_params, img_new, lm_new, mask_new
