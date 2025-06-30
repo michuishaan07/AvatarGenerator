@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SadTalker - Talking Avatar Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #1e1e2f;
+      color: #f1f1f1;
+      padding: 2em;
+    }
+    h1 {
+      color: #ffcc00;
+    }
+    input, select, button, textarea {
+      padding: 0.5em;
+      margin: 0.5em 0;
+      width: 100%;
+      max-width: 500px;
+    }
+    .form-group {
+      margin-bottom: 1em;
+    }
+    .preview, .image-preview, .audio-preview {
+      margin-top: 2em;
+    }
+    video, img, audio {
+      max-width: 100%;
+      border: 2px solid #444;
+      display: block;
+      margin-top: 1em;
+    }
+    .section-divider {
+      text-align: center;
+      margin: 1em 0;
+      font-weight: bold;
+      color: #ffcc00;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 SadTalker - Talking Avatar Generator</h1>
+
+  <form id="sadtalkerForm" enctype="multipart/form-data">
+    <div class="form-group">
+      <label>🖼️ Source Image</label>
+      <input type="file" id="sourceImage" name="source_image" accept="image/*">
+      <button type="button" onclick="openCamera()">📷 Open Camera</button>
+      <div id="cameraContainer" style="display:none;">
+        <video id="liveCamera" autoplay playsinline></video>
+        <button type="button" onclick="captureImage()">📸 Capture</button>
+      </div>
+      <canvas id="imageCanvas" style="display:none;"></canvas>
+      <div class="image-preview">
+        <img id="imagePreview" alt="Image Preview" />
+      </div>
+    </div>
+
+
+    <div class="section-divider">🎙️ TTS Option OR Driven Audio</div>
+
+    <div class="form-group">
+      <label>🔉 TTS Text (optional if audio provided)</label>
+      <textarea name="tts_text" placeholder="Type something to say..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>🌐 Source Language</label>
+      <input type="text" name="source_lang" value="en">
+    </div>
+
+    <div class="form-group">
+      <label>🌐 Target Language</label>
+      <input type="text" name="target_lang" value="en">
+    </div>
+
+    <div class="form-group">
+      <label>🗣️ Reference Audio for Voice Clone (optional)</label>
+      <input type="file" id="reference_audio" name="reference_audio" accept="audio/wav">
+      <button type="button" onclick="recordReferenceAudio()">🎤 Record Reference Audio</button>
+      <audio controls id="referenceAudioPreview"></audio>
+    </div>
+
+    <div class="form-group">
+      <label>🎵 Driven Audio (optional if using TTS)</label>
+      <input type="file" id="driven_audio" name="driven_audio" accept="audio/*">
+      <button type="button" onclick="recordDrivenAudio()">🎤 Record Driven Audio</button>
+      <audio controls id="drivenAudioPreview"></audio>
+    </div>
+
+    <div class="form-group">
+      <label>👁️ Reference Eyeblink Video (optional)</label>
+      <input type="file" name="ref_eyeblink" accept="video/*">
+    </div>
+
+    <div class="form-group">
+      <label>📐 Reference Pose Video (optional)</label>
+      <input type="file" name="ref_pose" accept="video/*">
+    </div>
+
+    <div class="form-group">
+      <label>🎭 Pose Style (0–45)</label>
+      <input type="number" name="pose_style" min="0" max="45" value="0">
+    </div>
+
+    <div class="form-group">
+      <label>✨ Face Enhancer</label>
+      <select name="enhancer">
+        <option value="">None</option>
+        <option value="gfpgan">GFPGAN</option>
+        <option value="RestoreFormer">RestoreFormer</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>🌄 Background Enhancer</label>
+      <select name="background_enhancer">
+        <option value="">None</option>
+        <option value="realesrgan">RealESRGAN</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>
+        <input type="checkbox" name="still"> 🚶 Still Mode
+      </label>
+    </div>
+
+    <button type="submit">🎬 Generate Talking Avatar</button>
+  </form>
+
+  <div class="preview" id="previewSection" style="display:none;">
+    <h2>🎥 Output Video</h2>
+    <video id="resultVideo" controls></video>
+  </div>
+
+  <script>
+    const form = document.getElementById("sadtalkerForm");
+    const preview = document.getElementById("previewSection");
+    const resultVideo = document.getElementById("resultVideo");
+    const sourceImage = document.getElementById("sourceImage");
+    const imagePreview = document.getElementById("imagePreview");
+    const referenceAudioPreview = document.getElementById("referenceAudioPreview");
+    const drivenAudioPreview = document.getElementById("drivenAudioPreview");
+
+    // Show image preview
+    sourceImage.onchange = () => {
+      const file = sourceImage.files[0];
+      if (file) {
+        imagePreview.src = URL.createObjectURL(file);
+      }
+    };
+
+    // Webcam image capture
+    // function captureImage() {
+    //   const canvas = document.getElementById("imageCanvas");
+    //   const ctx = canvas.getContext("2d");
+    //   const video = document.createElement("video");
+
+    //   navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+    //     video.srcObject = stream;
+    //     video.play();
+    //     document.body.appendChild(video);
+
+    //     setTimeout(() => {
+    //       canvas.width = video.videoWidth;
+    //       canvas.height = video.videoHeight;
+    //       ctx.drawImage(video, 0, 0);
+    //       canvas.toBlob(blob => {
+    //         const file = new File([blob], "webcam.png", { type: "image/png" });
+    //         const dataTransfer = new DataTransfer();
+    //         dataTransfer.items.add(file);
+    //         sourceImage.files = dataTransfer.files;
+    //         imagePreview.src = URL.createObjectURL(blob);
+    //         stream.getTracks().forEach(track => track.stop());
+    //         video.remove();
+    //       }, "image/png");
+    //     }, 2000); // auto-capture after 2 seconds
+    //   }).catch(err => alert("Camera access denied."));
+    // }
+    let videoStream = null;
+
+    function openCamera() {
+      const video = document.getElementById("liveCamera");
+      const cameraContainer = document.getElementById("cameraContainer");
+
+      navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        video.srcObject = stream;
+        videoStream = stream;
+        cameraContainer.style.display = "block";
+      }).catch(err => alert("Camera access denied."));
+    }
+
+    function captureImage() {
+      const canvas = document.getElementById("imageCanvas");
+      const ctx = canvas.getContext("2d");
+      const video = document.getElementById("liveCamera");
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+
+      canvas.toBlob(blob => {
+        const file = new File([blob], "webcam.png", { type: "image/png" });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        sourceImage.files = dataTransfer.files;
+        imagePreview.src = URL.createObjectURL(blob);
+
+        // Stop camera
+        videoStream.getTracks().forEach(track => track.stop());
+        document.getElementById("cameraContainer").style.display = "none";
+      }, "image/png");
+    }
+
+    // Audio recording (shared logic)
+    let mediaRecorder, audioChunks = [];
+
+    function startRecording(callback) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = e => {
+          audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+          const file = new File([audioBlob], "recorded.wav", { type: "audio/wav" });
+          callback(file);
+        };
+
+        mediaRecorder.start();
+        setTimeout(() => mediaRecorder.stop(), 3000); // 3 sec recording
+      }).catch(err => alert("Microphone access denied."));
+    }
+
+    function recordReferenceAudio() {
+      startRecording(file => {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        document.getElementById("reference_audio").files = dataTransfer.files;
+        referenceAudioPreview.src = URL.createObjectURL(file);
+      });
+    }
+
+    function recordDrivenAudio() {
+      startRecording(file => {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        document.getElementById("driven_audio").files = dataTransfer.files;
+        drivenAudioPreview.src = URL.createObjectURL(file);
+      });
+    }
+
+    // Form submission
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+
+      const res = await fetch("/generate", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (data.video_url) {
+        resultVideo.src = data.video_url;
+        preview.style.display = "block";
+      } else {
+        alert("❌ Error generating video.");
+      }
+    };
+  </script>
+</body>
+</html>

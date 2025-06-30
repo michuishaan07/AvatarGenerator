@@ -2,3 +2,15 @@ insrtruct2pix is in cartoonify env
 https://github.com/timothybrooks/instruct-pix2pix#other-ways-of-using-instructpix2pix
 
 chyanged utils/m float64 kiya h
+
+
+
+conda activate tts_env
+cd SadTalker
+python -m uvicorn translate_xtts_api:app --host 0.0.0.0 --port 8000
+
+
+
+conda activate avatar_pipeline
+cd SadTalker
+python voice_clone_gui_api.py
